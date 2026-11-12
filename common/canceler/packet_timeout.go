@@ -74,7 +74,13 @@ func (c *TimeoutPacketConn) SetTimeout(timeout time.Duration) bool {
 func (c *TimeoutPacketConn) setReadDeadline() error {
 	c.access.RLock()
 	defer c.access.RUnlock()
-	return c.PacketConn.SetReadDeadline(time.Now().Add(c.timeout))
+	// H: one timeout after the last activity, a write while the read waited too: re-arming a whole
+	// timeout from now when the deadline found the session active let it live up to twice it //H
+	deadline := time.Now().Add(c.timeout) //H
+	if !c.active.IsZero() {               //H
+		deadline = c.active.Add(c.timeout) //H
+	} //H
+	return c.PacketConn.SetReadDeadline(deadline) //H
 }
 
 func (c *TimeoutPacketConn) updateActive() {
